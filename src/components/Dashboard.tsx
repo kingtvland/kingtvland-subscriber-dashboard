@@ -23,33 +23,35 @@ const Dashboard: React.FC<DashboardProps> = ({ userInfo }) => {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      // Mock data - replace with actual API calls
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('Loading dashboard data for user:', userInfo);
       
-      // Mock subscriber data
-      setSubscriberCount(245);
-      setSubscriptionData([
-        { type: 'מנוי חדש', count: 156, color: '#ffd700' },
-        { type: 'הארכת מנוי', count: 89, color: '#4b0082' }
-      ]);
+      // Call the Netlify function to get user data
+      const params = new URLSearchParams();
+      if (userInfo.email) params.append('email', userInfo.email);
+      if (userInfo.phone) params.append('phone', userInfo.phone);
+      if (userInfo.username) params.append('username', userInfo.username);
       
-      // Mock user subscriptions
-      setUserSubscriptions([
-        {
-          username: 'kingtv_premium',
-          password: 'KT_2024_PRE',
-          expireDate: '2024-12-31',
-          status: 'active'
-        },
-        {
-          username: 'kingtv_sports',
-          password: 'KT_2024_SPT',
-          expireDate: '2024-11-15',
-          status: 'active'
-        }
-      ]);
+      console.log('Calling getUserData with params:', params.toString());
+      
+      const response = await fetch(`/.netlify/functions/getUserData?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Received data from getUserData:', data);
+      
+      setUserSubscriptions(data.subscriptions || []);
+      setSubscriptionData(data.subscriptionData || []);
+      setSubscriberCount(data.totalSubscribers || 0);
+      
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Fallback to empty data
+      setUserSubscriptions([]);
+      setSubscriptionData([]);
+      setSubscriberCount(0);
     } finally {
       setIsLoading(false);
     }

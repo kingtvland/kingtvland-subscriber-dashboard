@@ -92,15 +92,31 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call - replace with actual Netlify function call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Submitting form data:', formData);
       
-      // Mock successful registration
+      const response = await fetch('/.netlify/functions/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'שגיאה בשרת');
+      }
+
+      const result = await response.json();
+      console.log('Registration result:', result);
+      
       onSuccess(formData);
+      
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בעת ההרשמה. נסה שנית מאוחר יותר",
+        description: error.message || "אירעה שגיאה בעת ההרשמה. נסה שנית מאוחר יותר",
         variant: "destructive",
       });
     } finally {
