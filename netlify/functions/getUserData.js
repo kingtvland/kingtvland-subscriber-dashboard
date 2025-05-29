@@ -1,6 +1,4 @@
 
-const fetch = require('node-fetch');
-
 exports.handler = async (event, context) => {
   // Enable CORS
   const headers = {
@@ -51,60 +49,73 @@ exports.handler = async (event, context) => {
 
     console.log('Fetching user data from CSV:', csvUrl);
 
-    // Fetch CSV data from Google Sheets
+    // Fetch CSV data from Google Sheets using built-in fetch
     const response = await fetch(csvUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CSV: ${response.status}`);
+    }
+    
     const csvData = await response.text();
     
-    console.log('CSV data received for user data');
+    console.log('CSV data received for user data, length:', csvData.length);
 
     // Parse CSV data manually
-    const lines = csvData.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const lines = csvData.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      throw new Error('No data in CSV');
+    }
+    
+    const headers_csv = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    console.log('CSV headers:', headers_csv);
     
     const userSubscriptions = [];
     const subscriptionTypes = { new: 0, renewal: 0 };
 
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      
       const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
       const record = {};
       
-      headers.forEach((header, index) => {
+      headers_csv.forEach((header, index) => {
         record[header.toLowerCase()] = values[index] || '';
       });
 
-      // Check if this record matches the user
+      // Check if this record matches the user by email (primary matching)
       const emailMatch = email && record.email && record.email.toLowerCase() === email.toLowerCase();
-      const phoneMatch = phone && record.phone && record.phone.replace(/[-\s]/g, '') === phone.replace(/[-\s]/g, '');
-      const usernameMatch = username && record.username && record.username.toLowerCase() === username.toLowerCase();
       
-      if (emailMatch || phoneMatch || usernameMatch) {
-        // Determine subscription status based on expire date
-        const expireDate = new Date(record['expire date'] || record.expiredate || '');
-        const now = new Date();
+      if (emailMatch) {
+        // Parse expire date
+        const expireDateStr = record['expire date'] || record.expiredate || record['expire_date'] || '';
         let status = 'active';
         
-        if (isNaN(expireDate.getTime())) {
-          status = 'unknown';
-        } else if (expireDate < now) {
-          status = 'expired';
-        } else if ((expireDate.getTime() - now.getTime()) < (7 * 24 * 60 * 60 * 1000)) {
-          status = 'expiring';
+        if (expireDateStr) {
+          const expireDate = new Date(expireDateStr);
+          const now = new Date();
+          
+          if (!isNaN(expireDate.getTime())) {
+            if (expireDate < now) {
+              status = 'expired';
+            } else if ((expireDate.getTime() - now.getTime()) < (7 * 24 * 60 * 60 * 1000)) {
+              status = 'expiring';
+            }
+          } else {
+            status = 'unknown';
+          }
         }
 
         userSubscriptions.push({
           username: record.username || 'N/A',
           password: record.password || 'N/A',
-          expireDate: record['expire date'] || record.expiredate || 'N/A',
+          expireDate: expireDateStr || 'N/A',
           status: status
         });
 
-        // Count subscription types (for demo, we'll randomly assign)
-        if (Math.random() > 0.5) {
-          subscriptionTypes.new++;
-        } else {
+        // Count subscription types based on status
+        if (status === 'expired') {
           subscriptionTypes.renewal++;
+        } else {
+          subscriptionTypes.new++;
         }
       }
     }
@@ -117,8 +128,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         subscriptions: userSubscriptions,
         subscriptionData: [
-          { type: 'מנוי חדש', count: subscriptionTypes.new, color: '#ffd700' },
-          { type: 'הארכת מנוי', count: subscriptionTypes.renewal, color: '#4b0082' }
+          { type: 'מנוי פעיל', count: subscriptionTypes.new, color: '#ffd700' },
+          { type: 'מנוי לחידוש', count: subscriptionTypes.renewal, color: '#4b0082' }
         ],
         totalSubscribers: userSubscriptions.length
       })
@@ -129,7 +140,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ error: 'Internal server error: ' + error.message })
     };
   }
 };

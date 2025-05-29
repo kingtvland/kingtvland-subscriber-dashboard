@@ -1,6 +1,4 @@
 
-const fetch = require('node-fetch');
-
 exports.handler = async (event, context) => {
   // Enable CORS
   const headers = {
@@ -52,51 +50,47 @@ exports.handler = async (event, context) => {
 
     console.log('Fetching CSV data from:', csvUrl);
 
-    // Fetch CSV data from Google Sheets
+    // Fetch CSV data from Google Sheets using built-in fetch
     const response = await fetch(csvUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CSV: ${response.status}`);
+    }
+    
     const csvData = await response.text();
     
     console.log('CSV data received, length:', csvData.length);
 
     // Parse CSV data manually (simple parser for this use case)
-    const lines = csvData.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const lines = csvData.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      throw new Error('No data in CSV');
+    }
     
-    console.log('CSV headers:', headers);
+    const headers_csv = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    console.log('CSV headers:', headers_csv);
 
-    // Find matching records (at least 2 fields must match)
+    // Find matching records by email
     let matchingRecords = 0;
     
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue;
-      
       const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
       const record = {};
       
-      headers.forEach((header, index) => {
+      headers_csv.forEach((header, index) => {
         record[header.toLowerCase()] = values[index] || '';
       });
 
-      // Check for matches
+      // Check for email match
       const emailMatch = record.email && record.email.toLowerCase() === email.toLowerCase();
-      const phoneMatch = record.phone && record.phone.replace(/[-\s]/g, '') === phone.replace(/[-\s]/g, '');
-      const usernameMatch = record.username && record.username.toLowerCase() === username.toLowerCase();
       
-      const matches = [emailMatch, phoneMatch, usernameMatch].filter(Boolean).length;
-      
-      if (matches >= 2) {
+      if (emailMatch) {
         matchingRecords++;
       }
     }
 
     console.log('Matching records found:', matchingRecords);
-
-    // For demo purposes, we'll accept the registration if at least one field matches
-    // In production, you might want stricter validation
-    if (matchingRecords === 0) {
-      console.log('No matching records found for validation');
-      // Still allow registration for demo purposes
-    }
 
     // Return success response
     return {
@@ -114,7 +108,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ error: 'Internal server error: ' + error.message })
     };
   }
 };
