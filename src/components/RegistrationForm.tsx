@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,7 +78,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast({
         title: "שגיאה בטופס",
@@ -92,31 +91,33 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      console.log('Submitting form data:', formData);
-      
-      const response = await fetch('/.netlify/functions/submit', {
+      const response = await fetch('https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(formData),
+        body: new URLSearchParams({
+          email: formData.email,
+          paymentMethod: formData.paymentMethod,
+        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'שגיאה בשרת');
+      const result = await response.text();
+      if (result === 'Success') {
+        onSuccess(formData);
+        toast({
+          title: "הצלחה",
+          description: "שיטת התשלום עודכנה בהצלחה",
+          variant: "default",
+        });
+      } else {
+        throw new Error('Email not found');
       }
-
-      const result = await response.json();
-      console.log('Registration result:', result);
-      
-      onSuccess(formData);
-      
     } catch (error) {
       console.error('Registration error:', error);
       toast({
         title: "שגיאה",
-        description: error.message || "אירעה שגיאה בעת ההרשמה. נסה שנית מאוחר יותר",
+        description: error.message || "אירעה שגיאה בעת עדכון שיטת התשלום",
         variant: "destructive",
       });
     } finally {
