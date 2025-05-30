@@ -91,7 +91,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec', {
+      const response = await fetch('/.netlify/functions/proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
