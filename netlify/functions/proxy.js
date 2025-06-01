@@ -1,6 +1,6 @@
 exports.handler = async (event) => {
-  const fetch = (await import('node-fetch')).default; // שימוש ב-import דינמי
-  const url = 'https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec';
+  const fetch = (await import('node-fetch')).default;
+  const url = process.env.GOOGLE_SHEETS_UPDATE_URL;
 
   try {
     const response = await fetch(url, {
