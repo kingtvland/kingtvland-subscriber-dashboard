@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
-import { Button, Card, CardContent, CheckCircle } from './ui-components'; // הנחה לגבי ייבואים
+import { Button, Card, CardContent, CheckCircle } from './ui-components';
 
 const RegistrationForm: React.FC = () => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    username: '',
-    subscriptionType: '',
+    param1: '',
+    param2: '',
     paymentMethod: ''
   });
   const [errors, setErrors] = useState<any>({});
@@ -37,6 +34,32 @@ const RegistrationForm: React.FC = () => {
     }
   };
 
+  const validateForm = () => {
+    const newErrors: any = {};
+
+    if (!formData.param1.trim()) {
+      newErrors.param1 = 'פרמטר 1 חובה';
+    }
+
+    if (!formData.param2.trim()) {
+      newErrors.param2 = 'פרמטר 2 חובה';
+    }
+
+    if (!formData.paymentMethod) {
+      newErrors.paymentMethod = 'שיטת תשלום חובה';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
   return (
     <Card>
       <CardContent>
@@ -44,49 +67,20 @@ const RegistrationForm: React.FC = () => {
           <div>
             <input
               type="text"
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="שם"
+              value={formData.param1}
+              onChange={(e) => handleInputChange('param1', e.target.value)}
+              placeholder="אימייל/טלפון/שם משתמש"
             />
-            {errors.name && <span>{errors.name}</span>}
-          </div>
-          <div>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="אימייל"
-            />
-            {errors.email && <span>{errors.email}</span>}
+            {errors.param1 && <span>{errors.param1}</span>}
           </div>
           <div>
             <input
               type="text"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="טלפון"
+              value={formData.param2}
+              onChange={(e) => handleInputChange('param2', e.target.value)}
+              placeholder="אימייל/טלפון/שם משתמש"
             />
-            {errors.phone && <span>{errors.phone}</span>}
-          </div>
-          <div>
-            <input
-              type="text"
-              value={formData.username}
-              onChange={(e) => handleInputChange('username', e.target.value)}
-              placeholder="שם משתמש"
-            />
-            {errors.username && <span>{errors.username}</span>}
-          </div>
-          <div>
-            <select
-              value={formData.subscriptionType}
-              onChange={(e) => handleInputChange('subscriptionType', e.target.value)}
-            >
-              <option value="">בחר סוג מנוי</option>
-              <option value="basic">בסיסי</option>
-              <option value="premium">פרימיום</option>
-            </select>
-            {errors.subscriptionType && <span>{errors.subscriptionType}</span>}
+            {errors.param2 && <span>{errors.param2}</span>}
           </div>
           <div>
             <select
@@ -116,65 +110,6 @@ const RegistrationForm: React.FC = () => {
       </CardContent>
     </Card>
   );
-
-  function validateEmail(email: string) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  function validatePhone(phone: string) {
-    const phoneRegex = /^(\+972|0)[5-9]\d{8}$|^05[0-9]-\d{3}-\d{4}$/;
-    return phoneRegex.test(phone.replace(/[-\s]/g, ''));
-  }
-
-  function validateUsername(username: string) {
-    const usernameRegex = /^[a-zA-Z0-9_-]{3,}$/;
-    return usernameRegex.test(username);
-  }
-
-  function validateForm() {
-    const newErrors: any = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'שם חובה';
-    }
-
-    if (!formData.email) {
-      newErrors.email = 'אימייל חובה';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'פורמט אימייל לא תקין';
-    }
-
-    if (!formData.phone) {
-      newErrors.phone = 'טלפון חובה';
-    } else if (!validatePhone(formData.phone)) {
-      newErrors.phone = 'פורמט טלפון לא תקין (052-123-4567 או +972501234567)';
-    }
-
-    if (!formData.username) {
-      newErrors.username = 'שם משתמש חובה';
-    } else if (!validateUsername(formData.username)) {
-      newErrors.username = 'שם משתמש חייב להכיל לפחות 3 תווים (אותיות, מספרים, מקפים, קווים תחתונים)';
-    }
-
-    if (!formData.subscriptionType) {
-      newErrors.subscriptionType = 'סוג מנוי חובה';
-    }
-
-    if (!formData.paymentMethod) {
-      newErrors.paymentMethod = 'שיטת תשלום חובה';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
-  function handleInputChange(field: string, value: string) {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  }
 };
 
 export default RegistrationForm;
