@@ -18,29 +18,27 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    const { param1, param2, paymentMethod } = JSON.parse(event.body);
-    console.log('Received data:', { param1, param2, paymentMethod });
+    const { username, phone, email, paymentMethod } = JSON.parse(event.body);
 
-    if (!param1 || !param2 || !paymentMethod) {
+    if (!paymentMethod || (!username && !phone && !email)) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing param1, param2, or payment method' })
+        body: JSON.stringify({ error: 'Missing required fields' })
       };
     }
 
     const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL ||
       'https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec';
 
-    const fetch = (await import('node-fetch')).default; // Dynamic import
+    const fetch = (await import('node-fetch')).default;
     const updateResponse = await fetch(updateUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ param1, param2, paymentMethod })
+      body: JSON.stringify({ username, phone, email, paymentMethod })
     });
 
     const updateResult = await updateResponse.text();
-    console.log('Update response:', updateResult);
 
     if (updateResult.includes('Success')) {
       return {
