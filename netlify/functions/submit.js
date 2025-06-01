@@ -18,6 +18,14 @@ exports.handler = async function(event, context) {
   }
 
   try {
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Request body is required' })
+      };
+    }
+
     const { username, phone, email, paymentMethod } = JSON.parse(event.body);
 
     if (!paymentMethod || (!username && !phone && !email)) {
@@ -29,6 +37,14 @@ exports.handler = async function(event, context) {
     }
 
     const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL;
+    if (!updateUrl) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Google Sheets URL not configured' })
+      };
+    }
+
     const fetch = (await import('node-fetch')).default;
     const updateResponse = await fetch(updateUrl, {
       method: 'POST',
