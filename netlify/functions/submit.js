@@ -28,9 +28,7 @@ exports.handler = async function(event, context) {
       };
     }
 
-    const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL ||
-      'https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec';
-
+    const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL;
     const fetch = (await import('node-fetch')).default;
     const updateResponse = await fetch(updateUrl, {
       method: 'POST',
