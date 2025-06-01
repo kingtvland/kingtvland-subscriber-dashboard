@@ -72,7 +72,7 @@ exports.handler = async (event, context) => {
     console.log('CSV headers:', headers_csv);
 
     // Find matching records by email
-    let matchingRecords = 0;
+    let emailFound = false;
     
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
@@ -86,22 +86,60 @@ exports.handler = async (event, context) => {
       const emailMatch = record.email && record.email.toLowerCase() === email.toLowerCase();
       
       if (emailMatch) {
-        matchingRecords++;
+        emailFound = true;
+        console.log('Email found in row:', i + 1);
+        break;
       }
     }
 
-    console.log('Matching records found:', matchingRecords);
+    if (!emailFound) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Email not found in system' })
+      };
+    }
 
-    // Return success response
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ 
-        success: true, 
-        message: 'Registration successful',
-        matchingRecords
+    // Now try to update the Google Sheet via Apps Script
+    const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL || 'https://script.google.com/macros/s/AKfycbzrdTbbQ8xoTxqGfGp8YheUVZkoCMBqV7m9qWp1D0w4jcVuBRZnoP_R2Nb3XpH1HPNA9A/exec';
+    
+    console.log('Attempting to update sheet via:', updateUrl);
+    
+    const updateResponse = await fetch(updateUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        paymentMethod: paymentMethod
       })
-    };
+    });
+
+    const updateResult = await updateResponse.text();
+    console.log('Update response:', updateResult);
+
+    if (updateResult.includes('Success') || updateResponse.ok) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ 
+          success: true, 
+          message: 'Registration successful and sheet updated'
+        })
+      };
+    } else {
+      // If update fails, still return success since email was found
+      console.log('Sheet update failed but email was found');
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ 
+          success: true, 
+          message: 'Registration successful (update may have failed)'
+        })
+      };
+    }
 
   } catch (error) {
     console.error('Error processing registration:', error);

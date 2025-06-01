@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -91,33 +92,57 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/.netlify/functions/proxy', {
+      console.log('Submitting registration with data:', formData);
+      
+      const response = await fetch('/.netlify/functions/submit', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          email: formData.email,
-          paymentMethod: formData.paymentMethod,
-        }),
+        body: JSON.stringify(formData),
       });
 
-      const result = await response.text();
-      if (result === 'Success') {
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        }
+      }
+
+      const result = await response.json();
+      console.log('Registration result:', result);
+      
+      if (result.success) {
         onSuccess(formData);
         toast({
-          title: "הצלחה",
-          description: "שיטת התשלום עודכנה בהצלחה",
+          title: "הצלחה!",
+          description: "הרשמה הושלמה בהצלחה ושיטת התשלום עודכנה",
           variant: "default",
         });
       } else {
-        throw new Error('Email not found');
+        throw new Error(result.error || 'Registration failed');
       }
     } catch (error) {
       console.error('Registration error:', error);
+      
+      let errorMessage = "אירעה שגיאה בעת ההרשמה";
+      
+      if (error.message.includes('Email not found')) {
+        errorMessage = "כתובת המייל לא נמצאה במערכת. אנא בדוק שהמייל נכון או פנה לתמיכה.";
+      } else if (error.message.includes('All fields are required')) {
+        errorMessage = "אנא מלא את כל השדות הנדרשים";
+      }
+      
       toast({
         title: "שגיאה",
-        description: error.message || "אירעה שגיאה בעת עדכון שיטת התשלום",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -245,6 +270,65 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
       </CardContent>
     </Card>
   );
+
+  function validateEmail(email: string) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  function validatePhone(phone: string) {
+    const phoneRegex = /^(\+972|0)[5-9]\d{8}$|^05[0-9]-\d{3}-\d{4}$/;
+    return phoneRegex.test(phone.replace(/[-\s]/g, ''));
+  }
+
+  function validateUsername(username: string) {
+    const usernameRegex = /^[a-zA-Z0-9_-]{3,}$/;
+    return usernameRegex.test(username);
+  }
+
+  function validateForm() {
+    const newErrors: any = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'שם חובה';
+    }
+
+    if (!formData.email) {
+      newErrors.email = 'אימייל חובה';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'פורמט אימייל לא תקין';
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = 'טלפון חובה';
+    } else if (!validatePhone(formData.phone)) {
+      newErrors.phone = 'פורמט טלפון לא תקין (052-123-4567 או +972501234567)';
+    }
+
+    if (!formData.username) {
+      newErrors.username = 'שם משתמש חובה';
+    } else if (!validateUsername(formData.username)) {
+      newErrors.username = 'שם משתמש חייב להכיל לפחות 3 תווים (אותיות, מספרים, מקפים, קווים תחתונים)';
+    }
+
+    if (!formData.subscriptionType) {
+      newErrors.subscriptionType = 'סוג מנוי חובה';
+    }
+
+    if (!formData.paymentMethod) {
+      newErrors.paymentMethod = 'שיטת תשלום חובה';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  function handleInputChange(field: string, value: string) {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  }
 };
 
 export default RegistrationForm;
