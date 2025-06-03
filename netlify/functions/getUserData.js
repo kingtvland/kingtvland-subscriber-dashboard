@@ -41,12 +41,12 @@ export default async function handler(event, context) {
 
     const { email, phone, username } = event.queryStringParameters || {};
 
-    // Input validation and sanitization
-    if (!email && !phone && !username) {
+    // Input validation - need ALL three parameters
+    if (!email || !phone || !username) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'At least one identifier (email, phone, username) is required' })
+        body: JSON.stringify({ error: 'All identifiers (email, phone, username) are required' })
       };
     }
 
@@ -57,7 +57,7 @@ export default async function handler(event, context) {
     };
 
     const sanitizedEmail = sanitizeInput(email);
-    const sanitizedPhone = sanitizeInput(phone);
+    const sanitizedPhone = sanitizeInput(phone).replace(/[-\s]/g, ''); // Remove spaces and dashes
     const sanitizedUsername = sanitizeInput(username);
 
     // Get CSV URL from environment variable
@@ -73,7 +73,7 @@ export default async function handler(event, context) {
 
     console.log('Fetching user data from CSV for authenticated user');
 
-    // Rate limiting check (basic implementation)
+    // Rate limiting check
     const userAgent = event.headers['user-agent'] || '';
     const clientIP = event.headers['x-forwarded-for'] || event.headers['x-real-ip'] || 'unknown';
     console.log(`Request from IP: ${clientIP}, User-Agent: ${userAgent}`);
@@ -125,10 +125,20 @@ export default async function handler(event, context) {
         record[header.toLowerCase()] = values[index] || '';
       });
 
-      // Check if this record matches the authenticated user
-      const emailMatch = sanitizedEmail && record.email && record.email.toLowerCase() === sanitizedEmail;
+      // Clean the data from CSV
+      const recordEmail = record.email ? record.email.toLowerCase().trim() : '';
+      const recordPhone = record.phone ? record.phone.replace(/[-\s]/g, '') : '';
+      const recordUsername = record.username ? record.username.toLowerCase().trim() : '';
       
-      if (emailMatch) {
+      // Check if at least 2 parameters match
+      let matches = 0;
+      if (recordEmail === sanitizedEmail) matches++;
+      if (recordPhone === sanitizedPhone) matches++;
+      if (recordUsername === sanitizedUsername) matches++;
+      
+      console.log(`Row ${i}: Email match: ${recordEmail === sanitizedEmail}, Phone match: ${recordPhone === sanitizedPhone}, Username match: ${recordUsername === sanitizedUsername}, Total matches: ${matches}`);
+      
+      if (matches >= 2) {
         // Parse expire date safely
         const expireDateStr = record['expire date'] || record.expiredate || record['expire_date'] || '';
         let status = 'active';
@@ -156,10 +166,9 @@ export default async function handler(event, context) {
         // SECURITY: Do not expose passwords in the response
         userSubscriptions.push({
           username: record.username || 'N/A',
-          // password: record.password || 'N/A', // REMOVED for security
           expireDate: expireDateStr || 'N/A',
           status: status,
-          hasPassword: !!(record.password) // Only indicate if password exists
+          hasPassword: !!(record.password)
         });
 
         // Count subscription types based on status
@@ -171,7 +180,7 @@ export default async function handler(event, context) {
       }
     }
 
-    // Log successful data retrieval (without sensitive info)
+    // Log successful data retrieval
     console.log(`User subscriptions found: ${userSubscriptions.length} for authenticated user`);
 
     return {
