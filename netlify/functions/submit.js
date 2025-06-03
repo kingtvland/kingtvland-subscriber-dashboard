@@ -13,35 +13,32 @@ export default async function handler(event, context) {
   console.log('Function called with method:', event.httpMethod);
 
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return new Response('', { status: 200, headers });
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ success: false, error: 'Method not allowed' })
-    };
+    return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), {
+      status: 405,
+      headers
+    });
   }
 
   try {
     if (!event.body) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Request body is required' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Request body is required' }), {
+        status: 400,
+        headers
+      });
     }
 
     let formData;
     try {
       formData = JSON.parse(event.body);
     } catch (parseError) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid JSON format' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid JSON format' }), {
+        status: 400,
+        headers
+      });
     }
 
     console.log('Registration attempt received');
@@ -61,44 +58,40 @@ export default async function handler(event, context) {
 
     // Validate ALL required fields - email, phone, username, and paymentMethod
     if (!sanitizedEmail || !sanitizedPhone || !sanitizedUsername || !paymentMethod) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'All fields are required: email, phone, username, and payment method' 
-        })
-      };
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'All fields are required: email, phone, username, and payment method' 
+      }), {
+        status: 400,
+        headers
+      });
     }
 
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(sanitizedEmail)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid email format' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid email format' }), {
+        status: 400,
+        headers
+      });
     }
 
     // Phone format validation (Israeli format)
     const phoneRegex = /^(\+972|0)[5-9]\d{8}$|^05[0-9]-?\d{3}-?\d{4}$/;
     if (!phoneRegex.test(sanitizedPhone.replace(/[-\s]/g, ''))) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid phone format' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid phone format' }), {
+        status: 400,
+        headers
+      });
     }
 
     // Username validation
     const usernameRegex = /^[a-zA-Z0-9_-]{3,50}$/;
     if (!usernameRegex.test(sanitizedUsername)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid username format' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid username format' }), {
+        status: 400,
+        headers
+      });
     }
 
     // Validate subscription type and payment method
@@ -106,34 +99,28 @@ export default async function handler(event, context) {
     const validPaymentMethods = ['paybox', 'crypto'];
     
     if (!validSubscriptionTypes.includes(subscriptionType)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid subscription type' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid subscription type' }), {
+        status: 400,
+        headers
+      });
     }
 
     if (!validPaymentMethods.includes(paymentMethod)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid payment method' })
-      };
+      return new Response(JSON.stringify({ success: false, error: 'Invalid payment method' }), {
+        status: 400,
+        headers
+      });
     }
 
     const updateUrl = process.env.GOOGLE_SHEETS_UPDATE_URL;
-    console.log('Update URL configured:', !!updateUrl);
-    
     if (!updateUrl) {
-      console.log('Google Sheets URL not configured');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Google Sheets integration not configured'
-        })
-      };
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Google Sheets integration not configured' 
+      }), {
+        status: 500,
+        headers
+      });
     }
 
     const fetch = (await import('node-fetch')).default;
@@ -177,58 +164,37 @@ export default async function handler(event, context) {
     }
 
     if (updateResponse.ok) {
-      // Check if it's a JSON response with success field
-      if (updateResult.success === true || 
-          updateResult.success === false ||
-          (typeof updateResult.text === 'string' && updateResult.text.includes('Success'))) {
-        
-        if (updateResult.success === false) {
-          console.error('Google Sheets update failed:', updateResult.error);
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ 
-              success: false, 
-              error: updateResult.error || 'Registration failed' 
-            })
-          };
-        }
-        
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ 
-            success: true, 
-            message: 'Registration successful',
-            details: updateResult.message || 'Record updated successfully'
-          })
-        };
-      } else {
-        console.error('Unexpected response format:', updateResult);
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ success: false, error: 'Unexpected response from Google Sheets' })
-        };
-      }
-    } else {
-      console.error('Google Sheets request failed with status:', updateResponse.status);
-      return {
-        statusCode: updateResponse.status,
-        headers,
-        body: JSON.stringify({ 
+      if (updateResult.success === false) {
+        return new Response(JSON.stringify({ 
           success: false, 
-          error: `Google Sheets error: ${updateResponse.status}` 
-        })
-      };
+          error: updateResult.error || 'Registration failed' 
+        }), {
+          status: 400,
+          headers
+        });
+      }
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Registration successful',
+        details: updateResult.message || 'Record updated successfully'
+      }), {
+        status: 200,
+        headers
+      });
+    } else {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Google Sheets error: ${updateResponse.status}` 
+      }), {
+        status: updateResponse.status,
+        headers
+      });
     }
   } catch (error) {
-    console.error('Error processing registration:', error.message, error.stack);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ success: false, error: 'Internal server error' })
-    };
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
+      status: 500,
+      headers
+    });
   }
 }
 
