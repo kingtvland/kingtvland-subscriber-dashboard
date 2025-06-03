@@ -1,5 +1,5 @@
 
-exports.handler = async function(event, context) {
+export default async function handler(event, context) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -102,4 +102,6 @@ exports.handler = async function(event, context) {
       body: JSON.stringify({ error: 'Internal server error: ' + error.message })
     };
   }
-};
+}
+
+export { handler };
