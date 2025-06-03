@@ -1,45 +1,81 @@
-import React, { useState } from 'react';
 
-const RegistrationForm: React.FC = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    phone: '',
+import React, { useState } from 'react';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CheckCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface FormData {
+  name: string;
+  email: string;
+  phone: string;
+  username: string;
+  subscriptionType: string;
+  paymentMethod: string;
+}
+
+interface RegistrationFormProps {
+  onSuccess: (data: FormData) => void;
+}
+
+const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
     email: '',
+    phone: '',
+    username: '',
+    subscriptionType: '',
     paymentMethod: ''
   });
   const [errors, setErrors] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/.netlify/functions/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const result = await response.json();
-      if (result.success) {
-        alert('הרשמה הצליחה!');
-      } else {
-        setErrors({ submit: result.error || 'שגיאה בהרשמה' });
-      }
-    } catch (error) {
-      setErrors({ submit: 'שגיאה בשרת' });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const validatePhone = (phone: string) => {
+    const phoneRegex = /^(\+972|0)[5-9]\d{8}$|^05[0-9]-\d{3}-\d{4}$/;
+    return phoneRegex.test(phone.replace(/[-\s]/g, ''));
+  };
+
+  const validateUsername = (username: string) => {
+    const usernameRegex = /^[a-zA-Z0-9_-]{3,}$/;
+    return usernameRegex.test(username);
   };
 
   const validateForm = () => {
     const newErrors: any = {};
 
-    const providedCount = [formData.username, formData.phone, formData.email].filter(Boolean).length;
-    if (providedCount < 2) {
-      newErrors.submit = 'יש לספק לפחות שני זיהויים (שם משתמש, טלפון, או אימייל)';
+    if (!formData.name.trim()) {
+      newErrors.name = 'שם חובה';
+    }
+
+    if (!formData.email) {
+      newErrors.email = 'אימייל חובה';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'פורמט אימייל לא תקין';
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = 'טלפון חובה';
+    } else if (!validatePhone(formData.phone)) {
+      newErrors.phone = 'פורמט טלפון לא תקין (052-123-4567 או +972501234567)';
+    }
+
+    if (!formData.username) {
+      newErrors.username = 'שם משתמש חובה';
+    } else if (!validateUsername(formData.username)) {
+      newErrors.username = 'שם משתמש חייב להכיל לפחות 3 תווים (אותיות, מספרים, מקפים, קווים תחתונים)';
+    }
+
+    if (!formData.subscriptionType) {
+      newErrors.subscriptionType = 'סוג מנוי חובה';
     }
 
     if (!formData.paymentMethod) {
@@ -50,6 +86,79 @@ const RegistrationForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast({
+        title: "שגיאה בטופס",
+        description: "אנא תקן את השגיאות ונסה שנית",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      console.log('Submitting registration with data:', formData);
+      
+      const response = await fetch('/.netlify/functions/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        } catch (parseError) {
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        }
+      }
+
+      const result = await response.json();
+      console.log('Registration result:', result);
+      
+      if (result.success) {
+        onSuccess(formData);
+        toast({
+          title: "הצלחה!",
+          description: "הרשמה הושלמה בהצלחה ושיטת התשלום עודכנה",
+          variant: "default",
+        });
+      } else {
+        throw new Error(result.error || 'Registration failed');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      let errorMessage = "אירעה שגיאה בעת ההרשמה";
+      
+      if (error.message.includes('Email not found')) {
+        errorMessage = "כתובת המייל לא נמצאה במערכת. אנא בדוק שהמייל נכון או פנה לתמיכה.";
+      } else if (error.message.includes('All fields are required')) {
+        errorMessage = "אנא מלא את כל השדות הנדרשים";
+      }
+      
+      toast({
+        title: "שגיאה",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -58,61 +167,117 @@ const RegistrationForm: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: 'auto', padding: '20px', border: '1px solid #ccc', borderRadius: '5px' }}>
-      <h2>הרשמה</h2>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '10px' }}>
-          <input
-            type="text"
-            value={formData.username}
-            onChange={(e) => handleInputChange('username', e.target.value)}
-            placeholder="שם משתמש"
-            style={{ width: '100%', padding: '8px' }}
-          />
-          {errors.username && <span style={{ color: 'red' }}>{errors.username}</span>}
-        </div>
-        <div style={{ marginBottom: '10px' }}>
-          <input
-            type="text"
-            value={formData.phone}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            placeholder="טלפון"
-            style={{ width: '100%', padding: '8px' }}
-          />
-          {errors.phone && <span style={{ color: 'red' }}>{errors.phone}</span>}
-        </div>
-        <div style={{ marginBottom: '10px' }}>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="אימייל"
-            style={{ width: '100%', padding: '8px' }}
-          />
-          {errors.email && <span style={{ color: 'red' }}>{errors.email}</span>}
-        </div>
-        <div style={{ marginBottom: '10px' }}>
-          <select
-            value={formData.paymentMethod}
-            onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-            style={{ width: '100%', padding: '8px' }}
+    <Card className="backdrop-blur-md bg-white/10 border-white/20 shadow-2xl transform hover:scale-[1.02] transition-all duration-300 perspective-1000">
+      <CardHeader className="text-center">
+        <CardTitle className="text-3xl font-bold text-white mb-2">
+          הרשמה למערכת
+        </CardTitle>
+        <p className="text-purple-200">מלא את הפרטים להרשמה</p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="name" className="text-white mb-2 block">שם מלא</Label>
+              <Input
+                id="name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:border-amber-400"
+                placeholder="הכנס שם מלא"
+              />
+              {errors.name && <p className="text-red-300 text-sm mt-1">{errors.name}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="email" className="text-white mb-2 block">אימייל</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:border-amber-400"
+                placeholder="user@example.com"
+              />
+              {errors.email && <p className="text-red-300 text-sm mt-1">{errors.email}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="phone" className="text-white mb-2 block">טלפון</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:border-amber-400"
+                placeholder="052-123-4567"
+              />
+              {errors.phone && <p className="text-red-300 text-sm mt-1">{errors.phone}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="username" className="text-white mb-2 block">שם משתמש</Label>
+              <Input
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => handleInputChange('username', e.target.value)}
+                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:border-amber-400"
+                placeholder="username123"
+              />
+              {errors.username && <p className="text-red-300 text-sm mt-1">{errors.username}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="subscriptionType" className="text-white mb-2 block">סוג מנוי</Label>
+              <Select value={formData.subscriptionType} onValueChange={(value) => handleInputChange('subscriptionType', value)}>
+                <SelectTrigger className="bg-white/20 border-white/30 text-white focus:border-amber-400">
+                  <SelectValue placeholder="בחר סוג מנוי" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">מנוי חדש</SelectItem>
+                  <SelectItem value="renewal">הארכת מנוי</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.subscriptionType && <p className="text-red-300 text-sm mt-1">{errors.subscriptionType}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="paymentMethod" className="text-white mb-2 block">שיטת תשלום</Label>
+              <Select value={formData.paymentMethod} onValueChange={(value) => handleInputChange('paymentMethod', value)}>
+                <SelectTrigger className="bg-white/20 border-white/30 text-white focus:border-amber-400">
+                  <SelectValue placeholder="בחר שיטת תשלום" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paybox">PayBox</SelectItem>
+                  <SelectItem value="crypto">קריפטו</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.paymentMethod && <p className="text-red-300 text-sm mt-1">{errors.paymentMethod}</p>}
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-amber-500 to-purple-600 hover:from-amber-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="">בחר שיטת תשלום</option>
-            <option value="credit">כרטיס אשראי</option>
-            <option value="paypal">PayPal</option>
-          </select>
-          {errors.paymentMethod && <span style={{ color: 'red' }}>{errors.paymentMethod}</span>}
-        </div>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          style={{ width: '100%', padding: '10px', background: '#007bff', color: 'white', border: 'none', borderRadius: '5px' }}
-        >
-          {isSubmitting ? 'מעבד...' : 'הירשם עכשיו'}
-        </button>
-        {errors.submit && <p style={{ color: 'red' }}>{errors.submit}</p>}
-      </form>
-    </div>
+            {isSubmitting ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                מעבד...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 mr-2" />
+                הרשם עכשיו
+              </div>
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 
