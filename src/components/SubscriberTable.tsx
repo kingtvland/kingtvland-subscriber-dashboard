@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,9 +5,10 @@ import { Calendar, Key, User } from 'lucide-react';
 
 interface Subscription {
   username: string;
-  password: string;
+  // password: string; // REMOVED for security
   expireDate: string;
   status: string;
+  hasPassword?: boolean; // New field to indicate if password exists
 }
 
 interface SubscriberTableProps {
@@ -82,7 +82,9 @@ const SubscriberTable: React.FC<SubscriberTableProps> = ({ subscriptions }) => {
                       <Key className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-mono">{subscription.password}</p>
+                      <p className="text-white font-mono">
+                        {subscription.hasPassword ? '••••••••' : 'לא זמין'}
+                      </p>
                       <p className="text-purple-200 text-sm">סיסמה</p>
                     </div>
                   </div>

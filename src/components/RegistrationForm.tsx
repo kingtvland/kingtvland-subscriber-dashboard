@@ -101,12 +101,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      console.log('Submitting registration with data:', formData);
+      console.log('Submitting registration with validated data');
+      
+      // Create a simple auth token for demonstration (in production, use proper authentication)
+      const authToken = btoa(`user:${formData.email}:${Date.now()}`);
       
       const response = await fetch('/.netlify/functions/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify(formData),
       });
@@ -121,18 +125,29 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
           const errorData = JSON.parse(errorText);
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         } catch (parseError) {
-          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+          throw new Error(`Server error: ${response.status}`);
         }
       }
 
       const result = await response.json();
-      console.log('Registration result:', result);
+      console.log('Registration successful');
       
       if (result.success) {
         onSuccess(formData);
+        
+        // Clear form after successful submission
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          username: '',
+          subscriptionType: '',
+          paymentMethod: ''
+        });
+        
         toast({
           title: "הצלחה!",
-          description: "הרשמה הושלמה בהצלחה ושיטת התשלום עודכנה",
+          description: "הרשמה הושלמה בהצלחה",
           variant: "default",
         });
       } else {
@@ -141,11 +156,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess }) => {
     } catch (error) {
       console.error('Registration error:', error);
       
-      let errorMessage = "אירעה שגיאה בעת ההרשמה";
+      let errorMessage = "אירעה שגיאה בעת ההרשמה. אנא נסה שנית.";
       
-      if (error.message.includes('Email not found')) {
-        errorMessage = "כתובת המייל לא נמצאה במערכת. אנא בדוק שהמייל נכון או פנה לתמיכה.";
-      } else if (error.message.includes('All fields are required')) {
+      if (error.message.includes('Invalid email')) {
+        errorMessage = "כתובת המייל לא תקינה";
+      } else if (error.message.includes('Invalid phone')) {
+        errorMessage = "מספר הטלפון לא תקין";
+      } else if (error.message.includes('Invalid username')) {
+        errorMessage = "שם המשתמש לא תקין";
+      } else if (error.message.includes('required')) {
         errorMessage = "אנא מלא את כל השדות הנדרשים";
       }
       

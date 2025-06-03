@@ -23,24 +23,35 @@ const Dashboard: React.FC<DashboardProps> = ({ userInfo }) => {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      console.log('Loading dashboard data for user:', userInfo);
+      console.log('Loading dashboard data for authenticated user');
       
-      // Call the Netlify function to get user data
+      // Call the Netlify function to get user data with authentication
       const params = new URLSearchParams();
       if (userInfo.email) params.append('email', userInfo.email);
       if (userInfo.phone) params.append('phone', userInfo.phone);
       if (userInfo.username) params.append('username', userInfo.username);
       
-      console.log('Calling getUserData with params:', params.toString());
+      // Create a simple auth token (in production, use proper authentication)
+      const authToken = btoa(`user:${userInfo.email}:${Date.now()}`);
       
-      const response = await fetch(`/.netlify/functions/getUserData?${params.toString()}`);
+      console.log('Calling getUserData with authentication');
+      
+      const response = await fetch(`/.netlify/functions/getUserData?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Received data from getUserData:', data);
+      console.log('Received secure data from getUserData');
       
       setUserSubscriptions(data.subscriptions || []);
       setSubscriptionData(data.subscriptionData || []);
